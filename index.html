@@ -110,7 +110,6 @@ button{font-family:inherit;}
 @media (min-width:720px){ .shell{max-width:760px;padding-top:28px;} }
 @media (min-width:1024px){ .shell{max-width:880px;} }
 
-/* Letterhead / district selector */
 .letterhead{
   background:var(--surface);
   border:1px solid var(--border);
@@ -132,7 +131,6 @@ button{font-family:inherit;}
 .letterhead select:focus{border-color:var(--green);}
 .letterhead .hint{font-size:12px;color:var(--ink-faint);margin-top:8px;}
 
-/* Segmented tabs */
 .tabs{
   display:flex;background:var(--surface-sunken);border-radius:40px;padding:5px;
   margin-bottom:20px;border:1px solid var(--border);gap:4px;
@@ -146,7 +144,6 @@ button{font-family:inherit;}
 .section{display:block;}
 .section.hidden{display:none;}
 
-/* Section eyebrow */
 .step{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
   padding:20px;margin-bottom:14px;box-shadow:var(--shadow-sm);
@@ -221,7 +218,6 @@ button{font-family:inherit;}
   .enrol-sum{font-size:10px;}
 }
 
-/* Buttons */
 .btn{
   background:var(--green);border:1px solid var(--green-dark);padding:14px 18px;border-radius:60px;
   color:#fff;font-weight:700;font-size:14.5px;display:flex;align-items:center;justify-content:center;
@@ -235,7 +231,6 @@ button{font-family:inherit;}
 .btn-ghost{background:var(--surface-sunken);border:1px solid var(--border);color:var(--ink-soft);}
 .btn-sm{width:auto;padding:9px 16px;font-size:12.5px;}
 
-/* Status badge */
 .status-badge{
   display:inline-block;padding:4px 14px;border-radius:40px;font-size:11px;font-weight:700;
   letter-spacing:0.5px;text-transform:uppercase;margin-top:4px;
@@ -244,7 +239,6 @@ button{font-family:inherit;}
 .status-badge.none{background:var(--surface-sunken);color:var(--ink-faint);}
 .status-badge.updated{background:var(--brass-tint);color:var(--brass-dark);}
 
-/* Toast */
 .toast{
   position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
   background:var(--ink);color:#fff;padding:12px 20px;border-radius:60px;font-size:13.5px;
@@ -262,7 +256,6 @@ button{font-family:inherit;}
 }
 .footer-note strong{color:var(--ink-soft);}
 
-/* Part B */
 .part-b{
   background:var(--surface);border:1.5px solid var(--plum);border-left:5px solid var(--plum);
   border-radius:var(--radius-md);padding:20px;margin-top:20px;box-shadow:var(--shadow-sm);
@@ -298,9 +291,6 @@ button{font-family:inherit;}
 .subject-group input{padding:7px 4px;font-size:12.5px;text-align:center;}
 .subject-empty{text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;}
 
-/* ============================================================
-   OVERLAYS
-   ============================================================ */
 .overlay{
   display:none;position:fixed;inset:0;background:rgba(11,20,15,0.55);z-index:500;
   align-items:flex-start;justify-content:center;padding:0;overflow-y:auto;
@@ -326,7 +316,6 @@ button{font-family:inherit;}
 }
 .overlay-body{padding:20px 18px 40px;}
 
-/* Admin login */
 .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:22px;box-shadow:var(--shadow-sm);}
 .login-card h3{font-family:var(--font-display);font-size:18px;font-weight:560;color:var(--green-dark);margin-bottom:6px;}
 .login-card p{font-size:13px;color:var(--ink-soft);margin-bottom:18px;}
@@ -343,7 +332,6 @@ button{font-family:inherit;}
 
 .logged-in-banner{font-size:13px;color:var(--green-dark);display:flex;align-items:center;gap:7px;font-weight:600;}
 
-/* KPI stat row */
 .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
 @media (min-width:480px){ .stat-row{grid-template-columns:repeat(4,1fr);} }
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;}
@@ -385,9 +373,6 @@ button{font-family:inherit;}
 .empty-state i{font-size:30px;color:var(--border-strong);margin-bottom:12px;}
 .empty-state p{font-size:13.5px;max-width:280px;margin:0 auto;}
 
-/* ============================================================
-   REPORT DOCUMENT
-   ============================================================ */
 .report-doc{background:var(--surface);border-radius:var(--radius-md);padding:26px 22px;position:relative;overflow:hidden;}
 .report-watermark{position:absolute;top:50%;left:50%;width:340px;height:340px;transform:translate(-50%,-50%);opacity:0.045;pointer-events:none;}
 .report-header{text-align:center;border-bottom:3px double var(--green);padding-bottom:18px;margin-bottom:22px;position:relative;}
@@ -951,7 +936,6 @@ button{font-family:inherit;}
   let loggedInDistrict = null;
   let cachedData = null;
   
-  // Track existing records
   let primaryRecordId = null;
   let secondaryRecordId = null;
   let teacherRecordId = null;
@@ -1018,7 +1002,6 @@ button{font-family:inherit;}
   const subjectContainer = document.getElementById('subjectContainer');
   const subjectFilter = document.getElementById('subjectFilter');
   
-  // Status badges
   const priRecordStatus = document.getElementById('priRecordStatus');
   const secRecordStatus = document.getElementById('secRecordStatus');
   const teacherRecordStatus = document.getElementById('teacherRecordStatus');
@@ -1243,7 +1226,7 @@ button{font-family:inherit;}
   }
 
   // ============================================================
-  // POPULATE FORMS WITH EXISTING DATA
+  // POPULATE FORMS
   // ============================================================
   function populatePrimaryForm(data) {
     if (!data) return;
@@ -2203,17 +2186,18 @@ button{font-family:inherit;}
         mobile_network: document.getElementById('priMobile').value,
         specialization: document.getElementById('priSpecialization').value || '',
         teacher_sample: document.getElementById('priTeacherSample').value || '',
-        updated_at: new Date().toISOString()
+        created_at: new Date().toISOString()
       };
 
       let result;
       if (isUpdate) {
+        // Remove created_at from update payload
+        delete payload.created_at;
         result = await supabaseClient
           .from('schools_data')
           .update(payload)
           .eq('id', primaryRecordId);
       } else {
-        payload.created_at = new Date().toISOString();
         result = await supabaseClient
           .from('schools_data')
           .insert(payload);
@@ -2289,17 +2273,17 @@ button{font-family:inherit;}
         pit_latrines: parseInt(document.getElementById('secPit').value) || 0,
         mobile_network: document.getElementById('secMobile').value,
         teacher_sample: document.getElementById('secTeacherSample').value || '',
-        updated_at: new Date().toISOString()
+        created_at: new Date().toISOString()
       };
 
       let secResult;
       if (isUpdate) {
+        delete secPayload.created_at;
         secResult = await supabaseClient
           .from('schools_data')
           .update(secPayload)
           .eq('id', secondaryRecordId);
       } else {
-        secPayload.created_at = new Date().toISOString();
         secResult = await supabaseClient
           .from('schools_data')
           .insert(secPayload);
@@ -2322,7 +2306,7 @@ button{font-family:inherit;}
         district: teacherDistrict,
         school_name: teacherSchool,
         school_type: 'teacher_subject',
-        updated_at: new Date().toISOString()
+        created_at: new Date().toISOString()
       };
 
       SUBJECTS.forEach(s => {
@@ -2333,12 +2317,12 @@ button{font-family:inherit;}
 
       let teacherResult;
       if (teacherIsUpdate) {
+        delete teacherPayload.created_at;
         teacherResult = await supabaseClient
           .from('schools_data')
           .update(teacherPayload)
           .eq('id', teacherExists.id);
       } else {
-        teacherPayload.created_at = new Date().toISOString();
         teacherResult = await supabaseClient
           .from('schools_data')
           .insert(teacherPayload);
