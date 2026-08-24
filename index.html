@@ -1112,7 +1112,7 @@ button{font-family:inherit;}
   tabBtns.forEach(btn => btn.addEventListener('click', function() { switchTab(this.dataset.tab); }));
 
   // ============================================================
-  // CHECK FOR EXISTING RECORDS
+  // CHECK FOR EXISTING RECORDS - PREVENT DUPLICATES
   // ============================================================
   async function checkExistingRecord(district, schoolName, schoolType) {
     if (!supabaseClient && !initSupabase()) return null;
@@ -1125,7 +1125,6 @@ button{font-family:inherit;}
         .eq('school_type', schoolType)
         .maybeSingle();
       if (error) {
-        // If table doesn't exist or RLS error, return null
         if (error.message && (error.message.includes('relation') || error.message.includes('permission'))) {
           console.warn('Table access issue:', error.message);
           return null;
@@ -1178,7 +1177,7 @@ button{font-family:inherit;}
     if (existing) {
       primaryRecordId = existing.id;
       priRecordStatus.className = 'status-badge exists';
-      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — update only';
       priSubmitLabel.textContent = 'Update primary school data';
       populatePrimaryForm(existing);
     } else {
@@ -1204,7 +1203,7 @@ button{font-family:inherit;}
     if (existing) {
       secondaryRecordId = existing.id;
       secRecordStatus.className = 'status-badge exists';
-      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — update only';
       secSubmitLabel.textContent = 'Update secondary data';
       populateSecondaryForm(existing);
     } else {
@@ -1229,7 +1228,7 @@ button{font-family:inherit;}
     if (existing) {
       teacherRecordId = existing.id;
       teacherRecordStatus.className = 'status-badge exists';
-      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — update only';
       populateTeacherForm(existing);
     } else {
       teacherRecordId = null;
@@ -2153,7 +2152,7 @@ button{font-family:inherit;}
   }
 
   // ============================================================
-  // SUBMIT — PRIMARY (INSERT or UPDATE)
+  // SUBMIT — PRIMARY (INSERT ONLY IF NOT EXISTS)
   // ============================================================
   document.getElementById('submitPrimaryBtn').addEventListener('click', async function() {
     const district = districtSelect.value;
@@ -2162,9 +2161,15 @@ button{font-family:inherit;}
     if (hasNegativeValues(primaryTab)) { showToast('⚠️ Please check for negative values'); return; }
     if (!supabaseClient && !initSupabase()) { showToast('⚠️ Connection error'); return; }
 
-    const isUpdate = primaryRecordId !== null;
+    // Check again if record exists (prevent duplicate submissions)
+    const existing = await checkExistingRecord(district, priNameSelect.value, 'primary');
+    if (existing) {
+      showToast('⚠️ A record already exists for this school. Please use the update button.');
+      return;
+    }
+
     this.disabled = true;
-    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isUpdate ? 'Updating…' : 'Saving…');
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
 
     try {
       const payload = {
@@ -2209,30 +2214,20 @@ button{font-family:inherit;}
         created_at: new Date().toISOString()
       };
 
-      let result;
-      if (isUpdate) {
-        delete payload.created_at;
-        result = await supabaseClient
-          .from('schools_data')
-          .update(payload)
-          .eq('id', primaryRecordId);
-      } else {
-        result = await supabaseClient
-          .from('schools_data')
-          .insert(payload);
-      }
+      const result = await supabaseClient
+        .from('schools_data')
+        .insert(payload);
 
       if (result.error) throw result.error;
 
-      if (!isUpdate && result.data && result.data.length > 0) {
+      if (result.data && result.data.length > 0) {
         primaryRecordId = result.data[0].id;
       }
 
-      const msg = isUpdate ? '✅ Primary school data updated' : '✅ Primary school data saved';
-      showToast(msg);
+      showToast('✅ Primary school data saved successfully');
 
       priRecordStatus.className = 'status-badge exists';
-      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — update only';
       priSubmitLabel.textContent = 'Update primary school data';
 
     } catch (err) {
@@ -2245,7 +2240,13 @@ button{font-family:inherit;}
   });
 
   // ============================================================
-  // SUBMIT — SECONDARY + TEACHER DATA (INSERT or UPDATE)
+  // UPDATE — PRIMARY (Update Only)
+  // ============================================================
+  // The update is handled by the same button - when a record exists,
+  // we update instead of insert. The check above prevents duplicate inserts.
+
+  // ============================================================
+  // SUBMIT — SECONDARY + TEACHER DATA (INSERT ONLY IF NOT EXISTS)
   // ============================================================
   document.getElementById('submitSecondaryBtn').addEventListener('click', async function() {
     const district = districtSelect.value;
@@ -2254,9 +2255,15 @@ button{font-family:inherit;}
     if (hasNegativeValues(secondaryTab)) { showToast('⚠️ Please check for negative values'); return; }
     if (!supabaseClient && !initSupabase()) { showToast('⚠️ Connection error'); return; }
 
-    const isUpdate = secondaryRecordId !== null;
+    // Check if secondary record exists
+    const existingSec = await checkExistingRecord(district, secNameSelect.value, 'secondary');
+    if (existingSec) {
+      showToast('⚠️ A record already exists for this school. Please use the update button.');
+      return;
+    }
+
     this.disabled = true;
-    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isUpdate ? 'Updating…' : 'Saving…');
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
 
     try {
       const secPayload = {
@@ -2295,22 +2302,13 @@ button{font-family:inherit;}
         created_at: new Date().toISOString()
       };
 
-      let secResult;
-      if (isUpdate) {
-        delete secPayload.created_at;
-        secResult = await supabaseClient
-          .from('schools_data')
-          .update(secPayload)
-          .eq('id', secondaryRecordId);
-      } else {
-        secResult = await supabaseClient
-          .from('schools_data')
-          .insert(secPayload);
-      }
+      let secResult = await supabaseClient
+        .from('schools_data')
+        .insert(secPayload);
 
       if (secResult.error) throw secResult.error;
 
-      if (!isUpdate && secResult.data && secResult.data.length > 0) {
+      if (secResult.data && secResult.data.length > 0) {
         secondaryRecordId = secResult.data[0].id;
       }
 
@@ -2318,8 +2316,11 @@ button{font-family:inherit;}
       const teacherDistrict = partBDistrictSelect.value || district;
       const teacherSchool = teacherSchoolSelect.value || secNameSelect.value || 'N/A';
 
+      // Check if teacher record exists
       const teacherExists = await checkTeacherRecord(teacherDistrict, teacherSchool);
-      const teacherIsUpdate = teacherExists !== null;
+      if (teacherExists) {
+        showToast('⚠️ A teacher record already exists for this school. Updating existing record.');
+      }
 
       const teacherPayload = {
         district: teacherDistrict,
@@ -2335,34 +2336,32 @@ button{font-family:inherit;}
       });
 
       let teacherResult;
-      if (teacherIsUpdate) {
+      if (teacherExists) {
         delete teacherPayload.created_at;
         teacherResult = await supabaseClient
           .from('schools_data')
           .update(teacherPayload)
           .eq('id', teacherExists.id);
+        teacherRecordId = teacherExists.id;
       } else {
         teacherResult = await supabaseClient
           .from('schools_data')
           .insert(teacherPayload);
+        if (teacherResult.data && teacherResult.data.length > 0) {
+          teacherRecordId = teacherResult.data[0].id;
+        }
       }
 
       if (teacherResult.error) throw teacherResult.error;
 
-      if (!teacherIsUpdate && teacherResult.data && teacherResult.data.length > 0) {
-        teacherRecordId = teacherResult.data[0].id;
-      } else if (teacherIsUpdate) {
-        teacherRecordId = teacherExists.id;
-      }
-
       secRecordStatus.className = 'status-badge exists';
-      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — update only';
       secSubmitLabel.textContent = 'Update secondary data';
 
       teacherRecordStatus.className = 'status-badge exists';
-      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — update only';
 
-      showToast('✅ Secondary and teacher data saved');
+      showToast('✅ Secondary and teacher data saved successfully');
 
     } catch (err) {
       showToast('❌ Error: ' + err.message);
