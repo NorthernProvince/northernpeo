@@ -1124,7 +1124,14 @@ button{font-family:inherit;}
         .eq('school_name', schoolName)
         .eq('school_type', schoolType)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        // If table doesn't exist or RLS error, return null
+        if (error.message && (error.message.includes('relation') || error.message.includes('permission'))) {
+          console.warn('Table access issue:', error.message);
+          return null;
+        }
+        throw error;
+      }
       return data;
     } catch (err) {
       console.error('Error checking existing record:', err);
@@ -1142,7 +1149,13 @@ button{font-family:inherit;}
         .eq('school_name', schoolName)
         .eq('school_type', 'teacher_subject')
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        if (error.message && (error.message.includes('relation') || error.message.includes('permission'))) {
+          console.warn('Table access issue:', error.message);
+          return null;
+        }
+        throw error;
+      }
       return data;
     } catch (err) {
       console.error('Error checking teacher record:', err);
@@ -1618,7 +1631,14 @@ button{font-family:inherit;}
       let query = supabaseClient.from('schools_data').select('*').eq('district', loggedInDistrict).order('created_at', { ascending: false });
       if (filterType !== 'all') query = query.eq('school_type', filterType);
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        if (error.message && error.message.includes('relation')) {
+          adminList.innerHTML = emptyState('fa-database', 'The schools_data table does not exist yet. Please create it first.');
+          dataCount.textContent = 'Table not found';
+          return;
+        }
+        throw error;
+      }
 
       cachedData = data || [];
       updateStats();
@@ -2191,7 +2211,6 @@ button{font-family:inherit;}
 
       let result;
       if (isUpdate) {
-        // Remove created_at from update payload
         delete payload.created_at;
         result = await supabaseClient
           .from('schools_data')
