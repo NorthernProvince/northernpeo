@@ -14,9 +14,6 @@
 <style>
 /* ============================================================
    DESIGN TOKENS
-   Palette: paper (#F4F5F1), ledger-green (#0B3D2E), brass (#B8862E),
-   plum (#4B2E62, Part B only), oxblood (#8C2F2F, reports/danger), ink (#15201A)
-   Type: Fraunces (display) · IBM Plex Sans (body/UI) · IBM Plex Mono (data)
    ============================================================ */
 :root{
   --paper:#F4F5F1;
@@ -238,6 +235,15 @@ button{font-family:inherit;}
 .btn-ghost{background:var(--surface-sunken);border:1px solid var(--border);color:var(--ink-soft);}
 .btn-sm{width:auto;padding:9px 16px;font-size:12.5px;}
 
+/* Status badge for existing data */
+.status-badge{
+  display:inline-block;padding:4px 14px;border-radius:40px;font-size:11px;font-weight:700;
+  letter-spacing:0.5px;text-transform:uppercase;margin-top:4px;
+}
+.status-badge.exists{background:var(--green-tint);color:var(--green-dark);}
+.status-badge.none{background:var(--surface-sunken);color:var(--ink-faint);}
+.status-badge.updated{background:var(--brass-tint);color:var(--brass-dark);}
+
 /* Toast */
 .toast{
   position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
@@ -293,7 +299,7 @@ button{font-family:inherit;}
 .subject-empty{text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;}
 
 /* ============================================================
-   OVERLAYS (Admin + Report)
+   OVERLAYS
    ============================================================ */
 .overlay{
   display:none;position:fixed;inset:0;background:rgba(11,20,15,0.55);z-index:500;
@@ -491,6 +497,9 @@ button{font-family:inherit;}
         <div class="field"><label><i class="fas fa-hashtag"></i> EMIS number</label>
           <input type="text" id="priEmis" placeholder="Auto-filled" readonly>
         </div>
+        <div class="field" id="priStatusContainer">
+          <span class="status-badge none" id="priRecordStatus"><i class="fas fa-circle"></i> No record yet</span>
+        </div>
       </div>
     </div>
 
@@ -628,7 +637,7 @@ button{font-family:inherit;}
       </div>
     </div>
 
-    <button class="btn" data-type="primary"><i class="fas fa-cloud-upload-alt"></i> Submit primary school data</button>
+    <button class="btn" id="submitPrimaryBtn"><i class="fas fa-cloud-upload-alt"></i> <span id="priSubmitLabel">Submit primary school data</span></button>
   </div>
 
   <!-- ============================================================
@@ -656,6 +665,9 @@ button{font-family:inherit;}
         </div>
         <div class="field"><label><i class="fas fa-hashtag"></i> EMIS number</label>
           <input type="text" id="secEmis" placeholder="Auto-filled" readonly>
+        </div>
+        <div class="field" id="secStatusContainer">
+          <span class="status-badge none" id="secRecordStatus"><i class="fas fa-circle"></i> No record yet</span>
         </div>
       </div>
     </div>
@@ -792,6 +804,7 @@ button{font-family:inherit;}
       <div class="field" style="margin-bottom:14px;">
         <label><i class="fas fa-tag"></i> School name</label>
         <select id="teacherSchool" disabled><option value="">— Select district first —</option></select>
+        <span class="status-badge none" id="teacherRecordStatus" style="margin-top:8px;"><i class="fas fa-circle"></i> No record yet</span>
       </div>
 
       <div class="subject-search">
@@ -802,7 +815,7 @@ button{font-family:inherit;}
       <div class="scroll-container" id="subjectContainer"></div>
     </div>
 
-    <button class="btn" id="submitSecondaryComplete" style="margin-top:16px;"><i class="fas fa-cloud-upload-alt"></i> Submit secondary &amp; teacher data</button>
+    <button class="btn" id="submitSecondaryBtn" style="margin-top:16px;"><i class="fas fa-cloud-upload-alt"></i> <span id="secSubmitLabel">Submit secondary &amp; teacher data</span></button>
   </div>
 
   <div class="footer-note">
@@ -937,9 +950,14 @@ button{font-family:inherit;}
   let isLoggedIn = false;
   let loggedInDistrict = null;
   let cachedData = null;
+  
+  // Track existing records
+  let primaryRecordId = null;
+  let secondaryRecordId = null;
+  let teacherRecordId = null;
 
   // ============================================================
-  // SEAL — official Zambian coat of arms
+  // SEAL
   // ============================================================
   const COAT_OF_ARMS_URL = 'https://raw.githubusercontent.com/NorthernProvince/northernpeo/main/image/coat_arms.png';
 
@@ -999,9 +1017,16 @@ button{font-family:inherit;}
   const reportDoc = document.getElementById('reportDoc');
   const subjectContainer = document.getElementById('subjectContainer');
   const subjectFilter = document.getElementById('subjectFilter');
+  
+  // Status badges
+  const priRecordStatus = document.getElementById('priRecordStatus');
+  const secRecordStatus = document.getElementById('secRecordStatus');
+  const teacherRecordStatus = document.getElementById('teacherRecordStatus');
+  const priSubmitLabel = document.getElementById('priSubmitLabel');
+  const secSubmitLabel = document.getElementById('secSubmitLabel');
 
   // ============================================================
-  // INIT — districts, subjects, supabase
+  // INIT
   // ============================================================
   function populateDistrictDropdowns() {
     [districtSelect, adminDistrictSelect, partBDistrictSelect].forEach(sel => {
@@ -1104,6 +1129,219 @@ button{font-family:inherit;}
   tabBtns.forEach(btn => btn.addEventListener('click', function() { switchTab(this.dataset.tab); }));
 
   // ============================================================
+  // CHECK FOR EXISTING RECORDS
+  // ============================================================
+  async function checkExistingRecord(district, schoolName, schoolType) {
+    if (!supabaseClient && !initSupabase()) return null;
+    try {
+      const { data, error } = await supabaseClient
+        .from('schools_data')
+        .select('id, *')
+        .eq('district', district)
+        .eq('school_name', schoolName)
+        .eq('school_type', schoolType)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error checking existing record:', err);
+      return null;
+    }
+  }
+
+  async function checkTeacherRecord(district, schoolName) {
+    if (!supabaseClient && !initSupabase()) return null;
+    try {
+      const { data, error } = await supabaseClient
+        .from('schools_data')
+        .select('id, *')
+        .eq('district', district)
+        .eq('school_name', schoolName)
+        .eq('school_type', 'teacher_subject')
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error checking teacher record:', err);
+      return null;
+    }
+  }
+
+  async function checkAndUpdatePrimaryStatus() {
+    const district = districtSelect.value;
+    const schoolName = priNameSelect.value;
+    if (!district || !schoolName) {
+      priRecordStatus.className = 'status-badge none';
+      priRecordStatus.innerHTML = '<i class="fas fa-circle"></i> No record yet';
+      priSubmitLabel.textContent = 'Submit primary school data';
+      primaryRecordId = null;
+      return;
+    }
+    
+    const existing = await checkExistingRecord(district, schoolName, 'primary');
+    if (existing) {
+      primaryRecordId = existing.id;
+      priRecordStatus.className = 'status-badge exists';
+      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      priSubmitLabel.textContent = 'Update primary school data';
+      // Load existing data into form
+      populatePrimaryForm(existing);
+    } else {
+      primaryRecordId = null;
+      priRecordStatus.className = 'status-badge none';
+      priRecordStatus.innerHTML = '<i class="fas fa-circle"></i> No record yet — new submission';
+      priSubmitLabel.textContent = 'Submit primary school data';
+    }
+  }
+
+  async function checkAndUpdateSecondaryStatus() {
+    const district = districtSelect.value;
+    const schoolName = secNameSelect.value;
+    if (!district || !schoolName) {
+      secRecordStatus.className = 'status-badge none';
+      secRecordStatus.innerHTML = '<i class="fas fa-circle"></i> No record yet';
+      secSubmitLabel.textContent = 'Submit secondary & teacher data';
+      secondaryRecordId = null;
+      return;
+    }
+    
+    const existing = await checkExistingRecord(district, schoolName, 'secondary');
+    if (existing) {
+      secondaryRecordId = existing.id;
+      secRecordStatus.className = 'status-badge exists';
+      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      secSubmitLabel.textContent = 'Update secondary data';
+      populateSecondaryForm(existing);
+    } else {
+      secondaryRecordId = null;
+      secRecordStatus.className = 'status-badge none';
+      secRecordStatus.innerHTML = '<i class="fas fa-circle"></i> No record yet — new submission';
+      secSubmitLabel.textContent = 'Submit secondary & teacher data';
+    }
+  }
+
+  async function checkAndUpdateTeacherStatus() {
+    const district = partBDistrictSelect.value || districtSelect.value;
+    const schoolName = teacherSchoolSelect.value;
+    if (!district || !schoolName) {
+      teacherRecordStatus.className = 'status-badge none';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-circle"></i> No record yet';
+      teacherRecordId = null;
+      return;
+    }
+    
+    const existing = await checkTeacherRecord(district, schoolName);
+    if (existing) {
+      teacherRecordId = existing.id;
+      teacherRecordStatus.className = 'status-badge exists';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      populateTeacherForm(existing);
+    } else {
+      teacherRecordId = null;
+      teacherRecordStatus.className = 'status-badge none';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-circle"></i> No record yet — new submission';
+    }
+  }
+
+  // ============================================================
+  // POPULATE FORMS WITH EXISTING DATA
+  // ============================================================
+  function populatePrimaryForm(data) {
+    if (!data) return;
+    document.getElementById('priStatus').value = data.status || 'Rural';
+    document.getElementById('priDist').value = data.distance || 0;
+    document.getElementById('priEmis').value = data.emis || '';
+    document.getElementById('priPermHouses').value = data.perm_houses || 0;
+    document.getElementById('priIncompHouses').value = data.incomp_houses || 0;
+    document.getElementById('priTempHouses').value = data.temp_houses || 0;
+    document.getElementById('priPermClass').value = data.perm_class || 0;
+    document.getElementById('priIncompClass').value = data.incomp_class || 0;
+    document.getElementById('priTempClass').value = data.temp_class || 0;
+    document.getElementById('priDesks').value = data.desks || 0;
+    document.getElementById('priDeskShort').value = data.desk_shortfall || 0;
+    document.getElementById('priEce1Boys').value = data.ece1_boys || 0;
+    document.getElementById('priEce1Girls').value = data.ece1_girls || 0;
+    document.getElementById('priEce2Boys').value = data.ece2_boys || 0;
+    document.getElementById('priEce2Girls').value = data.ece2_girls || 0;
+    document.getElementById('priG1Boys').value = data.grade1_boys || 0;
+    document.getElementById('priG1Girls').value = data.grade1_girls || 0;
+    document.getElementById('priG27Boys').value = data.grade2_7_boys || 0;
+    document.getElementById('priG27Girls').value = data.grade2_7_girls || 0;
+    document.getElementById('priG89Boys').value = data.grade8_9_boys || 0;
+    document.getElementById('priG89Girls').value = data.grade8_9_girls || 0;
+    document.getElementById('priMale').value = data.male_teachers || 0;
+    document.getElementById('priFemale').value = data.female_teachers || 0;
+    document.getElementById('priTeacherShort').value = data.teacher_shortfall || 0;
+    document.getElementById('priCompFunc').value = data.comp_func || 0;
+    document.getElementById('priCompDys').value = data.comp_dys || 0;
+    document.getElementById('priPower').value = data.power || 'HEP';
+    document.getElementById('priWater').value = data.water || 'Piped';
+    document.getElementById('priVip').value = data.vip_latrines || 0;
+    document.getElementById('priSingleVip').value = data.single_vip || 0;
+    document.getElementById('priPit').value = data.pit_latrines || 0;
+    document.getElementById('priMobile').value = data.mobile_network || 'Airtel, MTN, Zamtel';
+    document.getElementById('priSpecialization').value = data.specialization || '';
+    document.getElementById('priTeacherSample').value = data.teacher_sample || '';
+    
+    // Trigger calculations
+    document.querySelectorAll('#primaryTab .calc-src, #primaryTab .enrol-src').forEach(el => {
+      el.dispatchEvent(new Event('input'));
+    });
+  }
+
+  function populateSecondaryForm(data) {
+    if (!data) return;
+    document.getElementById('secStatus').value = data.status || 'Rural';
+    document.getElementById('secDist').value = data.distance || 0;
+    document.getElementById('secEmis').value = data.emis || '';
+    document.getElementById('secPermHouses').value = data.perm_houses || 0;
+    document.getElementById('secIncompHouses').value = data.incomp_houses || 0;
+    document.getElementById('secTempHouses').value = data.temp_houses || 0;
+    document.getElementById('secPermClass').value = data.perm_class || 0;
+    document.getElementById('secIncompClass').value = data.incomp_class || 0;
+    document.getElementById('secTempClass').value = data.temp_class || 0;
+    document.getElementById('secDesks').value = data.desks || 0;
+    document.getElementById('secDeskShort').value = data.desk_shortfall || 0;
+    document.getElementById('secF1Boys').value = data.form1_boys || 0;
+    document.getElementById('secF1Girls').value = data.form1_girls || 0;
+    document.getElementById('secG9Boys').value = data.grade9_boys || 0;
+    document.getElementById('secG9Girls').value = data.grade9_girls || 0;
+    document.getElementById('secG1012Boys').value = data.grade10_12_boys || 0;
+    document.getElementById('secG1012Girls').value = data.grade10_12_girls || 0;
+    document.getElementById('secMale').value = data.male_teachers || 0;
+    document.getElementById('secFemale').value = data.female_teachers || 0;
+    document.getElementById('secTeacherShort').value = data.teacher_shortfall || 0;
+    document.getElementById('secCompFunc').value = data.comp_func || 0;
+    document.getElementById('secCompDys').value = data.comp_dys || 0;
+    document.getElementById('secWater').value = data.water || 'Piped';
+    document.getElementById('secVip').value = data.vip_latrines || 0;
+    document.getElementById('secSingleVip').value = data.single_vip || 0;
+    document.getElementById('secPit').value = data.pit_latrines || 0;
+    document.getElementById('secMobile').value = data.mobile_network || 'Airtel, MTN, Zamtel';
+    document.getElementById('secTeacherSample').value = data.teacher_sample || '';
+    
+    document.querySelectorAll('#secondaryTab .calc-src, #secondaryTab .enrol-src').forEach(el => {
+      el.dispatchEvent(new Event('input'));
+    });
+  }
+
+  function populateTeacherForm(data) {
+    if (!data) return;
+    SUBJECTS.forEach(s => {
+      const reqEl = document.getElementById('t_' + s.key + '_req');
+      const availEl = document.getElementById('t_' + s.key + '_avail');
+      if (reqEl) reqEl.value = data['t_' + s.key + '_req'] || 0;
+      if (availEl) availEl.value = data['t_' + s.key + '_avail'] || 0;
+      // Trigger calculation
+      if (reqEl || availEl) {
+        const evt = new Event('input');
+        if (reqEl) reqEl.dispatchEvent(evt);
+        if (availEl) availEl.dispatchEvent(evt);
+      }
+    });
+  }
+
+  // ============================================================
   // SCHOOL LISTS
   // ============================================================
   async function loadSchoolOptions(type) {
@@ -1199,11 +1437,22 @@ button{font-family:inherit;}
     const opt = this.options[this.selectedIndex];
     document.getElementById('priDist').value = (opt && opt.dataset.distance) || '';
     document.getElementById('priEmis').value = (opt && opt.dataset.emis) || '';
+    checkAndUpdatePrimaryStatus();
   });
   secNameSelect.addEventListener('change', function() {
     const opt = this.options[this.selectedIndex];
     document.getElementById('secDist').value = (opt && opt.dataset.distance) || '';
     document.getElementById('secEmis').value = (opt && opt.dataset.emis) || '';
+    checkAndUpdateSecondaryStatus();
+  });
+  teacherSchoolSelect.addEventListener('change', checkAndUpdateTeacherStatus);
+
+  // Also check when district changes
+  districtSelect.addEventListener('change', function() {
+    setTimeout(() => {
+      if (priNameSelect.value) checkAndUpdatePrimaryStatus();
+      if (secNameSelect.value) checkAndUpdateSecondaryStatus();
+    }, 300);
   });
 
   // ============================================================
@@ -1360,6 +1609,11 @@ button{font-family:inherit;}
         
         showToast('✅ Record deleted successfully');
         await loadAdminData();
+        
+        // Refresh status badges
+        if (priNameSelect.value) checkAndUpdatePrimaryStatus();
+        if (secNameSelect.value) checkAndUpdateSecondaryStatus();
+        if (teacherSchoolSelect.value) checkAndUpdateTeacherStatus();
         
     } catch (err) {
         showToast('❌ Error: ' + err.message);
@@ -1591,7 +1845,7 @@ button{font-family:inherit;}
   });
 
   // ============================================================
-  // EXCEL EXPORT — FIXED
+  // EXCEL EXPORT
   // ============================================================
   exportExcelBtn.addEventListener('click', async function() {
     if (!isLoggedIn || !loggedInDistrict) { 
@@ -1630,9 +1884,7 @@ button{font-family:inherit;}
         const dateTag = new Date().toISOString().slice(0,10);
         const sum = (arr, f) => arr.reduce((s,r)=>s+(parseInt(r[f])||0),0);
 
-        // ============================================================
-        // SUMMARY SHEET
-        // ============================================================
+        // Summary Sheet
         const summaryRows = [
             [loggedInDistrict.toUpperCase() + ' DISTRICT EDUCATION BOARD'],
             ['SUMMARY OF SCHOOL DATA — ' + dateTag],
@@ -1654,9 +1906,7 @@ button{font-family:inherit;}
         wsSummary['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:1} }, { s:{r:1,c:0}, e:{r:1,c:1} }];
         XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
 
-        // ============================================================
-        // PRIMARY SCHOOLS SHEET — FIXED field names
-        // ============================================================
+        // Primary Schools Sheet
         if (primaryData.length > 0) {
             const primaryHeaders = [
                 'S/NO', 'DISTRICT', 'SCHOOL NAME', 'STATUS', 'DISTANCE', 'EMIS',
@@ -1735,9 +1985,7 @@ button{font-family:inherit;}
             XLSX.utils.book_append_sheet(wb, ws, 'Primary Schools');
         }
 
-        // ============================================================
-        // SECONDARY SCHOOLS SHEET — FIXED field names
-        // ============================================================
+        // Secondary Schools Sheet
         if (secondaryData.length > 0) {
             const secondaryHeaders = [
                 'S/NO', 'DISTRICT', 'SCHOOL NAME', 'STATUS', 'DISTANCE', 'EMIS',
@@ -1813,9 +2061,7 @@ button{font-family:inherit;}
             XLSX.utils.book_append_sheet(wb, ws, 'Secondary Schools');
         }
 
-        // ============================================================
-        // TEACHER SUBJECT SHEET
-        // ============================================================
+        // Teacher Subject Sheet
         if (teacherData.length > 0) {
             const teacherHeaders = [
                 'S/NO', 'DISTRICT', 'SCHOOL NAME'
@@ -1909,17 +2155,25 @@ button{font-family:inherit;}
   }
 
   // ============================================================
-  // SUBMIT — PRIMARY
+  // SUBMIT — PRIMARY (INSERT OR UPDATE)
   // ============================================================
-  document.querySelector('[data-type="primary"]').addEventListener('click', async function() {
+  document.getElementById('submitPrimaryBtn').addEventListener('click', async function() {
     const district = districtSelect.value;
     if (!district) { showToast('⚠️ Please select your district first'); return; }
     if (!priNameSelect.value) { showToast('⚠️ Please select your school'); return; }
     if (hasNegativeValues(primaryTab)) { showToast('⚠️ Please check for negative values'); return; }
     if (!supabaseClient && !initSupabase()) { showToast('⚠️ Connection error'); return; }
 
+    const isUpdate = primaryRecordId !== null;
+    const action = isUpdate ? 'update' : 'insert';
+    
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isUpdate ? 'Updating…' : 'Saving…');
+
     try {
-      const { data, error } = await supabaseClient.rpc('insert_primary_school_data', {
+      // Use the database function - it will handle both insert and update
+      const result = await supabaseClient.rpc('insert_or_update_primary_school_data', {
+        p_id: primaryRecordId,
         p_district: district,
         p_school_name: priNameSelect.value || 'N/A',
         p_status: document.getElementById('priStatus').value,
@@ -1959,31 +2213,46 @@ button{font-family:inherit;}
         p_teacher_sample: document.getElementById('priTeacherSample').value || ''
       });
 
-      if (error) throw error;
+      if (result.error) throw result.error;
       
-      if (data && data.success) {
-        showToast('✅ Primary school data saved');
+      if (result.data && result.data.success) {
+        const msg = isUpdate ? '✅ Primary school data updated' : '✅ Primary school data saved';
+        showToast(msg);
+        primaryRecordId = result.data.id || primaryRecordId;
+        priRecordStatus.className = 'status-badge exists';
+        priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+        priSubmitLabel.textContent = 'Update primary school data';
       } else {
-        showToast('⚠️ ' + (data?.message || 'Unknown error'));
+        showToast('⚠️ ' + (result.data?.message || 'Unknown error'));
       }
     } catch (err) {
       showToast('❌ Error: ' + err.message);
       console.error(err);
+    } finally {
+      this.disabled = false;
+      this.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span id="priSubmitLabel">' + (primaryRecordId ? 'Update primary school data' : 'Submit primary school data') + '</span>';
     }
   });
 
   // ============================================================
-  // SUBMIT — SECONDARY + TEACHER DATA
+  // SUBMIT — SECONDARY + TEACHER DATA (INSERT OR UPDATE)
   // ============================================================
-  document.getElementById('submitSecondaryComplete').addEventListener('click', async function() {
+  document.getElementById('submitSecondaryBtn').addEventListener('click', async function() {
     const district = districtSelect.value;
     if (!district) { showToast('⚠️ Please select your district first'); return; }
     if (!secNameSelect.value) { showToast('⚠️ Please select your school'); return; }
     if (hasNegativeValues(secondaryTab)) { showToast('⚠️ Please check for negative values'); return; }
     if (!supabaseClient && !initSupabase()) { showToast('⚠️ Connection error'); return; }
 
+    const isUpdate = secondaryRecordId !== null;
+    
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isUpdate ? 'Updating…' : 'Saving…');
+
     try {
-      const secondaryResult = await supabaseClient.rpc('insert_secondary_school_data', {
+      // Submit secondary data
+      const secondaryResult = await supabaseClient.rpc('insert_or_update_secondary_school_data', {
+        p_id: secondaryRecordId,
         p_district: district,
         p_school_name: secNameSelect.value || 'N/A',
         p_status: document.getElementById('secStatus').value,
@@ -2019,10 +2288,15 @@ button{font-family:inherit;}
 
       if (secondaryResult.error) throw secondaryResult.error;
 
+      // Prepare teacher subject data
       const teacherDistrict = partBDistrictSelect.value || district;
       const teacherSchool = teacherSchoolSelect.value || secNameSelect.value || 'N/A';
 
+      // Check if teacher record exists
+      const teacherExists = await checkTeacherRecord(teacherDistrict, teacherSchool);
+      
       const teacherParams = {
+        p_id: teacherExists ? teacherExists.id : null,
         p_district: teacherDistrict,
         p_school_name: teacherSchool
       };
@@ -2033,14 +2307,29 @@ button{font-family:inherit;}
         teacherParams['p_' + s.key + '_short'] = parseInt(document.getElementById('t_' + s.key + '_short').value) || 0;
       });
 
-      const teacherResult = await supabaseClient.rpc('insert_teacher_subject_data', teacherParams);
+      const teacherResult = await supabaseClient.rpc('insert_or_update_teacher_subject_data', teacherParams);
 
       if (teacherResult.error) throw teacherResult.error;
+
+      // Update statuses
+      secondaryRecordId = secondaryResult.data?.id || secondaryRecordId;
+      secRecordStatus.className = 'status-badge exists';
+      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      secSubmitLabel.textContent = 'Update secondary data';
+      
+      teacherRecordId = teacherResult.data?.id || teacherExists?.id || null;
+      if (teacherRecordId) {
+        teacherRecordStatus.className = 'status-badge exists';
+        teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> Record exists — will update';
+      }
 
       showToast('✅ Secondary and teacher data saved');
     } catch (err) {
       showToast('❌ Error: ' + err.message);
       console.error(err);
+    } finally {
+      this.disabled = false;
+      this.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> <span id="secSubmitLabel">' + (secondaryRecordId ? 'Update secondary & teacher data' : 'Submit secondary & teacher data') + '</span>';
     }
   });
 
