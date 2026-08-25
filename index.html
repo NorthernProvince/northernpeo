@@ -622,7 +622,10 @@ button{font-family:inherit;}
       </div>
     </div>
 
-    <button class="btn" id="submitPrimaryBtn"><i class="fas fa-cloud-upload-alt"></i> <span id="priSubmitLabel">Submit primary school data</span></button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn" id="submitPrimaryBtn" style="flex:2;"><i class="fas fa-cloud-upload-alt"></i> <span id="priSubmitLabel">Submit primary school data</span></button>
+      <button class="btn btn-outline" id="clearPrimaryBtn" style="flex:1;background:var(--surface-sunken);color:var(--ink-soft);border:1px solid var(--border);"><i class="fas fa-undo"></i> Clear</button>
+    </div>
   </div>
 
   <!-- ============================================================
@@ -800,7 +803,10 @@ button{font-family:inherit;}
       <div class="scroll-container" id="subjectContainer"></div>
     </div>
 
-    <button class="btn" id="submitSecondaryBtn" style="margin-top:16px;"><i class="fas fa-cloud-upload-alt"></i> <span id="secSubmitLabel">Submit secondary &amp; teacher data</span></button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn" id="submitSecondaryBtn" style="flex:2;margin-top:0;"><i class="fas fa-cloud-upload-alt"></i> <span id="secSubmitLabel">Submit secondary &amp; teacher data</span></button>
+      <button class="btn btn-outline" id="clearSecondaryBtn" style="flex:1;margin-top:0;background:var(--surface-sunken);color:var(--ink-soft);border:1px solid var(--border);"><i class="fas fa-undo"></i> Clear</button>
+    </div>
   </div>
 
   <div class="footer-note">
@@ -1112,7 +1118,7 @@ button{font-family:inherit;}
   tabBtns.forEach(btn => btn.addEventListener('click', function() { switchTab(this.dataset.tab); }));
 
   // ============================================================
-  // CHECK FOR EXISTING RECORDS - STRICT DUPLICATE PREVENTION
+  // CHECK FOR EXISTING RECORDS
   // ============================================================
   async function checkExistingRecord(district, schoolName, schoolType) {
     if (!district || !schoolName) return null;
@@ -1179,13 +1185,13 @@ button{font-family:inherit;}
     if (existing) {
       primaryRecordId = existing.id;
       priRecordStatus.className = 'status-badge exists';
-      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — update only';
+      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — click Update to edit';
       priSubmitLabel.textContent = 'Update primary school data';
       populatePrimaryForm(existing);
     } else {
       primaryRecordId = null;
       priRecordStatus.className = 'status-badge none';
-      priRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — new submission';
+      priRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — click Submit to add';
       priSubmitLabel.textContent = 'Submit primary school data';
     }
   }
@@ -1205,13 +1211,13 @@ button{font-family:inherit;}
     if (existing) {
       secondaryRecordId = existing.id;
       secRecordStatus.className = 'status-badge exists';
-      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — update only';
+      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — click Update to edit';
       secSubmitLabel.textContent = 'Update secondary data';
       populateSecondaryForm(existing);
     } else {
       secondaryRecordId = null;
       secRecordStatus.className = 'status-badge none';
-      secRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — new submission';
+      secRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — click Submit to add';
       secSubmitLabel.textContent = 'Submit secondary & teacher data';
     }
   }
@@ -1230,13 +1236,77 @@ button{font-family:inherit;}
     if (existing) {
       teacherRecordId = existing.id;
       teacherRecordStatus.className = 'status-badge exists';
-      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — update only';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — click Update to edit';
       populateTeacherForm(existing);
     } else {
       teacherRecordId = null;
       teacherRecordStatus.className = 'status-badge none';
-      teacherRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — new submission';
+      teacherRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — click Submit to add';
     }
+  }
+
+  // ============================================================
+  // CLEAR FORM FUNCTIONS
+  // ============================================================
+  function clearPrimaryForm() {
+    // Reset all number inputs to 0
+    document.querySelectorAll('#primaryTab input[type="number"]').forEach(input => {
+      if (!input.hasAttribute('readonly')) {
+        input.value = 0;
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+    // Reset selects to default
+    document.getElementById('priStatus').value = 'Rural';
+    document.getElementById('priPower').value = 'HEP';
+    document.getElementById('priWater').value = 'Piped';
+    document.getElementById('priMobile').value = 'Airtel, MTN, Zamtel';
+    document.getElementById('priSpecialization').value = '';
+    document.getElementById('priTeacherSample').value = '';
+    // Reset status
+    priRecordStatus.className = 'status-badge none';
+    priRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — click Submit to add';
+    priSubmitLabel.textContent = 'Submit primary school data';
+    primaryRecordId = null;
+    // Reset school selection
+    priNameSelect.value = '';
+    document.getElementById('priDist').value = '';
+    document.getElementById('priEmis').value = '';
+    showToast('🔄 Form cleared');
+  }
+
+  function clearSecondaryForm() {
+    // Reset all number inputs to 0
+    document.querySelectorAll('#secondaryTab input[type="number"]').forEach(input => {
+      if (!input.hasAttribute('readonly')) {
+        input.value = 0;
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+    // Reset selects to default
+    document.getElementById('secStatus').value = 'Rural';
+    document.getElementById('secWater').value = 'Piped';
+    document.getElementById('secMobile').value = 'Airtel, MTN, Zamtel';
+    document.getElementById('secTeacherSample').value = '';
+    // Reset teacher subject fields
+    document.querySelectorAll('.subj-req, .subj-avail').forEach(input => {
+      input.value = 0;
+      input.dispatchEvent(new Event('input'));
+    });
+    // Reset status
+    secRecordStatus.className = 'status-badge none';
+    secRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — click Submit to add';
+    secSubmitLabel.textContent = 'Submit secondary & teacher data';
+    secondaryRecordId = null;
+    teacherRecordId = null;
+    teacherRecordStatus.className = 'status-badge none';
+    teacherRecordStatus.innerHTML = '<i class="fas fa-circle"></i> ○ No record — click Submit to add';
+    // Reset school selection
+    secNameSelect.value = '';
+    document.getElementById('secDist').value = '';
+    document.getElementById('secEmis').value = '';
+    teacherSchoolSelect.value = '';
+    showToast('🔄 Form cleared');
   }
 
   // ============================================================
@@ -1447,6 +1517,12 @@ button{font-family:inherit;}
       if (secNameSelect.value) checkAndUpdateSecondaryStatus();
     }, 300);
   });
+
+  // ============================================================
+  // CLEAR BUTTONS
+  // ============================================================
+  document.getElementById('clearPrimaryBtn').addEventListener('click', clearPrimaryForm);
+  document.getElementById('clearSecondaryBtn').addEventListener('click', clearSecondaryForm);
 
   // ============================================================
   // ADMIN LOGIN
@@ -2154,7 +2230,7 @@ button{font-family:inherit;}
   }
 
   // ============================================================
-  // SUBMIT — PRIMARY (STRICT DUPLICATE PREVENTION)
+  // SUBMIT — PRIMARY (With proper duplicate prevention)
   // ============================================================
   document.getElementById('submitPrimaryBtn').addEventListener('click', async function() {
     const district = districtSelect.value;
@@ -2166,18 +2242,11 @@ button{font-family:inherit;}
     // CRITICAL: Check if record exists before any operation
     const existing = await checkExistingRecord(district, priNameSelect.value, 'primary');
     
-    // If record exists and we don't have an ID (or ID mismatch), prevent duplicate
-    if (existing) {
-      // If we already have the ID, this is an update operation
-      if (primaryRecordId && primaryRecordId === existing.id) {
-        // Proceed with update
-      } else {
-        // This is a duplicate attempt - block it
-        showToast('⚠️ A record already exists for this school. Use the Update button.');
-        // Refresh the status to show the existing record
-        await checkAndUpdatePrimaryStatus();
-        return;
-      }
+    // If record exists and we don't have the ID or ID mismatch, block duplicate
+    if (existing && (!primaryRecordId || primaryRecordId !== existing.id)) {
+      showToast('⚠️ A record already exists for this school. Use the Update button.');
+      await checkAndUpdatePrimaryStatus();
+      return;
     }
 
     const isUpdate = primaryRecordId !== null;
@@ -2229,14 +2298,12 @@ button{font-family:inherit;}
 
       let result;
       if (isUpdate) {
-        // Update existing record
         delete payload.created_at;
         result = await supabaseClient
           .from('schools_data')
           .update(payload)
           .eq('id', primaryRecordId);
       } else {
-        // Insert new record - but we already checked it doesn't exist
         result = await supabaseClient
           .from('schools_data')
           .insert(payload);
@@ -2252,7 +2319,7 @@ button{font-family:inherit;}
       showToast(msg);
 
       priRecordStatus.className = 'status-badge exists';
-      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — update only';
+      priRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — click Update to edit';
       priSubmitLabel.textContent = 'Update primary school data';
 
     } catch (err) {
@@ -2265,7 +2332,7 @@ button{font-family:inherit;}
   });
 
   // ============================================================
-  // SUBMIT — SECONDARY (STRICT DUPLICATE PREVENTION)
+  // SUBMIT — SECONDARY (With proper duplicate prevention)
   // ============================================================
   document.getElementById('submitSecondaryBtn').addEventListener('click', async function() {
     const district = districtSelect.value;
@@ -2277,13 +2344,10 @@ button{font-family:inherit;}
     // CRITICAL: Check if secondary record exists
     const existingSec = await checkExistingRecord(district, secNameSelect.value, 'secondary');
     
-    if (existingSec) {
-      // If record exists and we don't have the ID, block duplicate
-      if (!secondaryRecordId || secondaryRecordId !== existingSec.id) {
-        showToast('⚠️ A record already exists for this school. Use the Update button.');
-        await checkAndUpdateSecondaryStatus();
-        return;
-      }
+    if (existingSec && (!secondaryRecordId || secondaryRecordId !== existingSec.id)) {
+      showToast('⚠️ A record already exists for this school. Use the Update button.');
+      await checkAndUpdateSecondaryStatus();
+      return;
     }
 
     const isUpdate = secondaryRecordId !== null;
@@ -2346,13 +2410,12 @@ button{font-family:inherit;}
         secondaryRecordId = secResult.data[0].id;
       }
 
-      // Teacher subject data - check for duplicates
+      // Teacher subject data
       const teacherDistrict = partBDistrictSelect.value || district;
       const teacherSchool = teacherSchoolSelect.value || secNameSelect.value || 'N/A';
 
       const teacherExists = await checkTeacherRecord(teacherDistrict, teacherSchool);
       
-      // If teacher exists but we don't have the ID, get it
       if (teacherExists && !teacherRecordId) {
         teacherRecordId = teacherExists.id;
       }
@@ -2390,12 +2453,12 @@ button{font-family:inherit;}
       if (teacherResult.error) throw teacherResult.error;
 
       secRecordStatus.className = 'status-badge exists';
-      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — update only';
+      secRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — click Update to edit';
       secSubmitLabel.textContent = 'Update secondary data';
 
       if (teacherRecordId) {
         teacherRecordStatus.className = 'status-badge exists';
-        teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — update only';
+        teacherRecordStatus.innerHTML = '<i class="fas fa-check-circle"></i> ✓ Record exists — click Update to edit';
       }
 
       showToast('✅ Secondary and teacher data saved successfully');
